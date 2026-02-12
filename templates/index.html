@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 投資監控儀表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .active-btn {
+            background-color: rgba(34, 211, 238, 0.2) !important;
+            border-color: #22d3ee !important;
+            color: #22d3ee !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+    <main class="mx-auto flex min-h-screen max-w-4xl items-center px-4 py-8">
+        <section class="w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
+            
+            <div class="mb-8 border-b border-slate-800 pb-6">
+                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">FBI Multi-Stock Monitor</p>
+                        <h1 id="mainTitle" class="mt-2 text-3xl font-bold text-cyan-300">載入中...</h1>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-500 uppercase">Last Update</p>
+                        <span id="updatedAt" class="text-sm font-mono text-slate-300">--</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-wrap gap-2">
+                    <button onclick="changeSymbol('SMH', this)" class="symbol-btn active-btn rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-bold transition-all">SMH</button>
+                    <button onclick="changeSymbol('TSM', this)" class="symbol-btn rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-bold transition-all hover:bg-slate-700">TSM</button>
+                    <button onclick="changeSymbol('NVDA', this)" class="symbol-btn rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-bold transition-all hover:bg-slate-700">NVDA</button>
+                    <button onclick="changeSymbol('GOOGL', this)" class="symbol-btn rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-bold transition-all hover:bg-slate-700">GOOGL</button>
+                </div>
+            </div>
+
+            <div class="grid gap-6 md:grid-cols-3">
+                <article class="rounded-xl border border-slate-800 bg-slate-950/60 p-6">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">目前價格</p>
+                    <p class="mt-4 text-4xl font-bold text-emerald-300">$<span id="priceValue">--</span></p>
+                </article>
+
+                <article class="rounded-xl border border-slate-800 bg-slate-950/60 p-6">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">RSI (14)</p>
+                    <p id="rsiValue" class="mt-4 text-4xl font-bold">--</p>
+                    <p id="rsiHint" class="mt-2 text-xs text-slate-500 italic">計算中...</p>
+                </article>
+
+                <article id="scoreCard" class="rounded-xl border border-slate-800 bg-slate-950/60 p-6 transition-all duration-500">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">FBI 投資分數</p>
+                    <p id="scoreValue" class="mt-4 text-4xl font-bold">--</p>
+                    <p id="statusLabel" class="mt-2 text-sm text-slate-400">分析中...</p>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let currentSymbol = 'SMH';
+
+        async function updateStockData() {
+            console.log("嘗試抓取數據: " + currentSymbol);
+            try {
+                // 使用絕對路徑確保不會出錯
+                const response = await fetch('/api/stock/' + currentSymbol);
+                const data = await response.json();
+                console.log("抓取成功:", data);
+
+                // 強制填入數據，並加上錯誤檢查
+                if(document.getElementById('mainTitle')) document.getElementById('mainTitle').innerText = data.symbol + " 監控站";
+                if(document.getElementById('priceValue')) document.getElementById('priceValue').innerText = data.price;
+                if(document.getElementById('rsiValue')) document.getElementById('rsiValue').innerText = data.rsi;
+                if(document.getElementById('scoreValue')) document.getElementById('scoreValue').innerText = data.score;
+                if(document.getElementById('statusLabel')) document.getElementById('statusLabel').innerText = data.status;
+                if(document.getElementById('updatedAt')) document.getElementById('updatedAt').innerText = data.update_time;
+
+                // RSI 顏色
+                const rsiEl = document.getElementById('rsiValue');
+                if (rsiEl) {
+                    if (data.rsi >= 70) rsiEl.className = "mt-4 text-4xl font-bold text-red-500";
+                    else if (data.rsi <= 35) rsiEl.className = "mt-4 text-4xl font-bold text-emerald-400";
+                    else rsiEl.className = "mt-4 text-4xl font-bold text-slate-100";
+                }
+
+                // 分數顏色
+                const scoreVal = document.getElementById('scoreValue');
+                if (scoreVal) {
+                    const colors = {"白色": "#f8fafc", "淡紫色": "#c084fc", "深紫色": "#a855f7", "綠色": "#34d399"};
+                    scoreVal.style.color = colors[data.light_color] || "#f8fafc";
+                }
+
+            } catch (err) {
+                console.error("JavaScript 抓取過程出錯:", err);
+            }
+        }
+
+        function changeSymbol(symbol, btn) {
+            currentSymbol = symbol;
+            document.querySelectorAll('.symbol-btn').forEach(b => b.classList.remove('active-btn'));
+            btn.classList.add('active-btn');
+            updateStockData();
+        }
+
+        // 初始化
+        updateStockData();
+        // 每 30 秒自動更新
+        setInterval(updateStockData, 30000);
+    </script>
+</body>
+</html>
