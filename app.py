@@ -5,34 +5,42 @@ import os
 
 app = Flask(__name__)
 
-# 股價抓取函式 (加強穩定版)
+def calculate_rsi(data, window=14):
+    delta = data.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
 def get_stock_data(symbol):
     try:
-        # 使用 yfinance 抓取最近一天的資料
         stock = yf.Ticker(symbol)
-        # 增加 interval="1m" 確保抓到最新的價格
-        df = stock.history(period="1d", interval="1m")
+        # 抓取過去一個月的歷史資料來計算 RSI
+        df = stock.history(period="1mo")
         
-        if df.empty:
-            # 如果一分鐘資料沒抓到，改抓普通的日資料
-            df = stock.history(period="1d")
-            
-        if not df.empty:
-            current_price = float(df['Close'].iloc[-1])
+        if not df.empty and len(df) >= 14:
+            current_price = df['Close'].iloc[-1]
             prev_close = stock.info.get('previousClose', current_price)
-            change = current_price - prev_close
-            change_percent = (change / prev_close) * 100
+            
+            # 計算 RSI
+            rsi_series = calculate_rsi(df['Close'])
+            current_rsi = rsi_series.iloc[-1]
+            
+            # 簡單的投資分數邏輯 (可以根據 RSI 定義)
+            # RSI < 30 (超賣) 分數高, RSI > 70 (超買) 分數低
+            score = 100 - current_rsi 
             
             return {
                 "symbol": symbol,
                 "price": round(current_price, 2),
-                "change": round(change, 2),
-                "percent": round(change_percent, 2),
+                "change": round(current_price - prev_close, 2),
+                "percent": round(((current_price - prev_close) / prev_close) * 100, 2),
+                "rsi": round(current_rsi, 2),
+                "score": round(score, 1),
                 "status": "success"
             }
-        return {"status": "error", "message": "No data found"}
+        return {"status": "error", "message": "Data insufficient"}
     except Exception as e:
-        print(f"抓取 {symbol} 出錯: {e}")
         return {"status": "error", "message": str(e)}
 
 @app.route('/')
@@ -48,6 +56,5 @@ def stock_api(symbol):
         return jsonify(data), 500
 
 if __name__ == '__main__':
-    # 這是 Render 部署的關鍵：讀取環境變數 PORT
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
